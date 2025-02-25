@@ -1,5 +1,7 @@
 # shimadzu
 
+Example .DAT file available here: https://drive.google.com/file/d/1J8KFRbFUlyxr1bG1Lk7j8ygkmhae3aHw/view?usp=sharing
+
 Enables conversion of proprietary .DAT files for Shimadzu HPV software from .DAT to however many .TIFF 16-bit frames are in the video
 Include both scripts and the .DLL file in the directory with the .DAT files
 
