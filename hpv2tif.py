@@ -16,23 +16,38 @@ class DAT_Selector:
                     self.ch.append(item)
 
     def userInput(self):
-        self.inputFile = inq.list_input("Pick the .DAT file from the directory the script is located in", choices=self.ch)  # Prompt user input for which of these .dat files should be processed
         self.inputStamp = ''
         self.inputChoice = ''
-        if "-ys" or "-ns" in sys.argv:
-            if "-ys" in sys.argv:
-                self.inputStamp = 'Yes'
-            if "-ns" in sys.argv:
-                self.inputStamp = 'No'
-        if not ("-ys" or "-ns") in sys.argv:
-            self.inputStamp = inq.list_input("Do you want the relative timestamps in the bottom-right?", choices=['Yes', 'No'])
-        if "-yc" or "-nc" in sys.argv:
-            if "-yc" in sys.argv:
-                self.inputChoice = 'Yes'
-            if "-nc" in sys.argv:
-                self.inputChoice = 'No'
-        if not "-yc" or not "-nc" in sys.argv:
-            self.inputChoice = inq.list_input("Do you want the folder of TIFF files opened afterward?", choices=['No', 'Yes'])
+        self.batch = ''
+        if "-b" not in sys.argv:
+            self.inputFile = inq.list_input("Pick the .DAT file from the directory the script is located in", choices=self.ch)  # Prompt user input for which of these .dat files should be processed
+            if "-ys" or "-ns" in sys.argv:
+                if "-ys" in sys.argv:
+                    self.inputStamp = 'Yes'
+                if "-ns" in sys.argv:
+                    self.inputStamp = 'No'
+            if not ("-ys" or "-ns") in sys.argv:
+                self.inputStamp = inq.list_input("Do you want the relative timestamps in the bottom-right?", choices=['Yes', 'No'])
+            self.batch = False
+
+            if "-yc" or "-nc" in sys.argv:
+                if "-yc" in sys.argv:
+                    self.inputChoice = 'Yes'
+                if "-nc" in sys.argv:
+                    self.inputChoice = 'No'
+            if not "-yc" or not "-nc" in sys.argv:
+                self.inputChoice = inq.list_input("Do you want the folder of TIFF files opened afterward?", choices=['No', 'Yes'])
+
+        if "-b" in sys.argv:
+            if "-ys" or "-ns" in sys.argv:
+                if "-ys" in sys.argv:
+                    self.inputStamp = 'Yes'
+                if "-ns" in sys.argv:
+                    self.inputStamp = 'No'
+            if not ("-ys" or "-ns") in sys.argv:
+                self.inputStamp = inq.list_input("Do you want the relative timestamps in the bottom-right?", choices=['Yes', 'No'])
+            self.batch = True
+            self.inputChoice = "No"
 
     def dirCreation(self):
         self.outputDir = self.inputFile[:-4]
@@ -89,49 +104,96 @@ if __name__ == "__main__":
 
     ds = DAT_Selector()
     ds.userInput()
-    ds.dirCreation()
 
-    br = BYTE_Recoverer()
-    recSpeed = br.byteSearch(b'\x30\x30\x07\x30', 14, 4).decode('utf-8')[:-1]
-    dateTime_byteData = br.byteSearch(b'\x40\x40\x0e\x40', 14, 16)
-    #br.dateMaker() #    Uncomment to print date and time at time of recording
-    imageNum = int.from_bytes(br.byteSearch(b'\x60\x60\x05\x60', 14, 4), "little")
-    relTime = br.byteSearch(b'\x60\x60\x06\x60', 14, 4).decode('ascii')
-    images_byteData = br.byteSearch(b'\xa0\xa0\x01\xa0', 14, (imageNum*250*400*4))
+    if ds.batch == False:
+        ds.dirCreation()
+        br = BYTE_Recoverer()
+        recSpeed = br.byteSearch(b'\x30\x30\x07\x30', 14, 4).decode('utf-8')[:-1]
+        dateTime_byteData = br.byteSearch(b'\x40\x40\x0e\x40', 14, 16)
+        #br.dateMaker() #    Uncomment to print date and time at time of recording
+        imageNum = int.from_bytes(br.byteSearch(b'\x60\x60\x05\x60', 14, 4), "little")
+        relTime = br.byteSearch(b'\x60\x60\x06\x60', 14, 4).decode('ascii')
+        images_byteData = br.byteSearch(b'\xa0\xa0\x01\xa0', 14, (imageNum*250*400*4))
 
-    tw = TIFF_Writer()
-    
-    first_img = None
-    with alive_bar(imageNum, spinner="dots_waves", bar=None, calibrate=60, spinner_length=30) as bar:
-        for i in range(0, imageNum):
-            is_first_img = (i <= 1)
-            frameNum = "{:03d}".format(i+1)  # Format index with leading zeros for use as the frame number
-            imagebytes=np.frombuffer(images_byteData[(i)*200000:200000*(i+1)],dtype=np.int16)
-            imagebytes=np.reshape(imagebytes,shape=(250,400))
-            imagebytes=np.flipud(imagebytes) # flip vertically to match view in HPV viewer
-            tifffile.imwrite(ds.outputStr+'_'+frameNum+'.tiff', imagebytes)    # Initially, all the frames w/o the relative timestamps are created.
-            
-            img = cv2.imread(ds.outputStr+'_'+frameNum+'.tiff')                # Read each file in and draw the translucent black background and white text of the timestamp
-            tw.relTimeStamp(img)
-            cv2.imwrite(ds.outputStr+'_'+(frameNum)+'.tiff', img)              # Overwrite all of the TIFF files
+        tw = TIFF_Writer()
+        
+        first_img = None
+        with alive_bar(imageNum, spinner="dots_waves", bar=None, calibrate=60, spinner_length=30) as bar:
+            for i in range(0, imageNum):
+                is_first_img = (i <= 1)
+                frameNum = "{:03d}".format(i+1)  # Format index with leading zeros for use as the frame number
+                imagebytes=np.frombuffer(images_byteData[(i)*200000:200000*(i+1)],dtype=np.int16)
+                imagebytes=np.reshape(imagebytes,(250,400))
+                imagebytes=np.flipud(imagebytes) # flip vertically to match view in HPV viewer
+                tifffile.imwrite(ds.outputStr+'_'+frameNum+'.tiff', imagebytes)    # Initially, all the frames w/o the relative timestamps are created.
+                
+                img = cv2.imread(ds.outputStr+'_'+frameNum+'.tiff')                # Read each file in and draw the translucent black background and white text of the timestamp
+                tw.relTimeStamp(img)
+                cv2.imwrite(ds.outputStr+'_'+(frameNum)+'.tiff', img)              # Overwrite all of the TIFF files
 
-            diff_img = None
-            if is_first_img:
-                first_img = img.copy()
-            else:
-                diff_A = cv2.subtract(first_img, img) #cv2.absdiff(first_img, img)
-                diff_B = cv2.subtract(diff_A, cv2.threshold(diff_A, 200, 255, cv2.THRESH_TOZERO)[1])
-                diff_img = cv2.add(img, diff_B)
-                diff_img = cv2.normalize(diff_img, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-            if not is_first_img:
-                cv2.imwrite(f"DIFFs/diff_{ds.outputStr}_{frameNum}.tiff", diff_img)
+                diff_img = None
+                if is_first_img:
+                    first_img = img.copy()
+                else:
+                    diff_A = cv2.subtract(first_img, img) #cv2.absdiff(first_img, img)
+                    diff_B = cv2.subtract(diff_A, cv2.threshold(diff_A, 200, 255, cv2.THRESH_TOZERO)[1])
+                    diff_img = cv2.add(img, diff_B)
+                    diff_img = cv2.normalize(diff_img, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+                if not is_first_img:
+                    cv2.imwrite(f"DIFFs/diff_{ds.outputStr}_{frameNum}.tiff", diff_img)
 
-            relTime = int(relTime) + (int(recSpeed))                        # Increment the relative time by adding recSpeed to it
-            bar()
-    print("Finished!")
+                relTime = int(relTime) + (int(recSpeed))                        # Increment the relative time by adding recSpeed to it
+                bar()
+        print("Finished!")
 
-    if(ds.inputChoice == "Yes"):
-        sp.Popen(r'explorer /separate,'+os.getcwd())  # Show video file in explorer
-    if "-mp4" in sys.argv:
-        os.chdir("..")
-        os.system("python convert.py ")
+        if(ds.inputChoice == "Yes"):
+            sp.Popen(r'explorer /separate,'+os.getcwd())  # Show video file in explorer
+        if "-mp4" in sys.argv:
+            os.chdir("..")
+            os.system("python convert.py ")
+
+    if ds.batch == True:
+        
+        batch_br = [0] * len(ds.ch)
+        with alive_bar(len(ds.ch)*(256), spinner="dots_waves", bar=None, calibrate=60, spinner_length=35) as bar_batch:
+            for n, dat in enumerate(ds.ch):
+                ds.inputFile = dat
+                ds.dirCreation()
+                batch_br[n] = BYTE_Recoverer()
+                recSpeed = batch_br[n].byteSearch(b'\x30\x30\x07\x30', 14, 4).decode('utf-8')[:-1]
+                dateTime_byteData = batch_br[n].byteSearch(b'\x40\x40\x0e\x40', 14, 16)
+                #batch_br[n].dateMaker() #    Uncomment to print date and time at time of recording
+                imageNum = int.from_bytes(batch_br[n].byteSearch(b'\x60\x60\x05\x60', 14, 4), "little")
+                relTime = batch_br[n].byteSearch(b'\x60\x60\x06\x60', 14, 4).decode('ascii')
+                images_byteData = batch_br[n].byteSearch(b'\xa0\xa0\x01\xa0', 14, (imageNum*250*400*4))
+
+                tw = TIFF_Writer()
+                
+                first_img = None
+                for i in range(0, imageNum):
+                    is_first_img = (i <= 1)
+                    frameNum = "{:03d}".format(i+1)  # Format index with leading zeros for use as the frame number
+                    imagebytes=np.frombuffer(images_byteData[(i)*200000:200000*(i+1)],dtype=np.int16)
+                    imagebytes=np.reshape(imagebytes,(250,400))
+                    imagebytes=np.flipud(imagebytes) # flip vertically to match view in HPV viewer
+                    tifffile.imwrite(ds.outputStr+'_'+frameNum+'.tiff', imagebytes)    # Initially, all the frames w/o the relative timestamps are created.
+                    
+                    img = cv2.imread(ds.outputStr+'_'+frameNum+'.tiff')                # Read each file in and draw the translucent black background and white text of the timestamp
+                    tw.relTimeStamp(img)
+                    cv2.imwrite(ds.outputStr+'_'+(frameNum)+'.tiff', img)              # Overwrite all of the TIFF files
+
+                    diff_img = None
+                    if is_first_img:
+                        first_img = img.copy()
+                    else:
+                        diff_A = cv2.subtract(first_img, img) #cv2.absdiff(first_img, img)
+                        diff_B = cv2.subtract(diff_A, cv2.threshold(diff_A, 200, 255, cv2.THRESH_TOZERO)[1])
+                        diff_img = cv2.add(img, diff_B)
+                        diff_img = cv2.normalize(diff_img, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+                    if not is_first_img:
+                        cv2.imwrite(f"DIFFs/diff_{ds.outputStr}_{frameNum}.tiff", diff_img)
+
+                    relTime = int(relTime) + (int(recSpeed))                        # Increment the relative time by adding recSpeed to it
+                    bar_batch()
+                print(ds.outputStr + " processed! " + str(n+1) + "/" + str(len(ds.ch)))
+                os.chdir("..")
