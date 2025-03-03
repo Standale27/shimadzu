@@ -37,10 +37,15 @@ hpv2tif.py has these available flags:
 
 -mp4 for: Runs convert.py script immediately following completion
 
+-b for: Batch conversion, will convert all .DAT files in the directory in which the script is located. Will default to not opening the directory afterward, can have yes/no timestamps for all/none of the DAT files.
 
-Example:
+
+Examples:
 python hpv2tif.py -ys -nc -mp4
 Will run hpv2tif.py, will include relative timestamps in the bottom right corner, will not open the folder upon completion, will run the convert.py script right after.
+
+python hpv2tif.py -b -ns
+Will run hpv2tif.py, will not include relative timestamps in the bottom right corner, will iterate over all .DAT files in the filder.
 
 No flags:
 
@@ -63,17 +68,11 @@ No flags:
 -Wait until completion
 
 
-With flags:
+With flags + batch:
 
 -Run hpv2tif.py
-
--Select a .DAT file from the given list
-
--Select a directory from the given list (assumes directory is full of .tiff files)
-
--Indicate if the MP4 file should be highlighted in the folder after conversion
 
 -Wait until completion
 
 
-Future work will involve streamlining the scripts and making it more modular, as well as implementing actual good coding practices. Could automate object tracking now as well. Could explore batch conversion as well. Could explore rewriting in rust for performance as well.
+Future work will involve streamlining the scripts and making it more modular, as well as implementing actual good coding practices. Could automate object tracking now as well. Could explore rewriting in rust for performance as well.
