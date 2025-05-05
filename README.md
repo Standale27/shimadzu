@@ -9,7 +9,7 @@ Include both scripts and the .DLL file in the directory with the .DAT files
 
 Running hpv2tif.py with no specified arguments will list the .DAT files in the directory in which the script is located. Choose a file to create the folder of TIFF images.
 
-There are four arguments you can use when running hpv2tif.py:
+There are four arguments you can use when running hpv2tif.py (abbreviations allowed! You can use --batch, --add, --open, --make as well):
 >--batchprocess
 >
       Batch processes all .DAT files in current directory
