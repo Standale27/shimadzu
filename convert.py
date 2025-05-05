@@ -3,25 +3,45 @@ import inquirer as inq
 import subprocess as sp
 import pathlib, sys
 import moviepy as mpy
+import argparse
 from alive_progress import alive_bar
+
+parser = argparse.ArgumentParser(description="Convert .DAT files to TIFF files", allow_abbrev=True)
+parser.add_argument("--batchprocess", action="store_true", default=False, help="Batch process all .DAT files in the current directory")
+parser.add_argument("--folder", type=str, default=None, help="Specify a .DAT file to process")
+
+args = parser.parse_args()
 
 os.chdir(pathlib.Path(__file__).parent.resolve())              # Change directory to specified path
 
 class mp4Constructor:
+    """
+    Class to convert a folder of TIFF16s files to an MP4 video file.
+    """
     def __init__(self):
-        os.chdir(inq.list_input("Pick folder of TIFF16s files for conversion to MP4", choices=[x for x in os.listdir() if os.path.isdir(os.path.join(os.getcwd(), x))]))
-        self.inputChoice = inq.list_input("Do you want the MP4 file highlighted in the folder afterward?", choices=['No', 'Yes'])
+        """
+        Initialize the mp4Constructor class.
+        """
+        if args.folder is None and args.batchprocess == False:
+            os.chdir(inq.list_input("Pick folder of TIFF16s files for conversion to MP4", choices=[x for x in os.listdir() if os.path.isdir(os.path.join(os.getcwd(), x))]))
+            self.inputChoice = inq.list_input("Do you want the MP4 file highlighted in the folder afterward?", choices=['No', 'Yes'])
+        else:
+            os.chdir(args.folder)
+            self.inputChoice = 'No'
     def fileName(self):
-        self.video_name = os.getcwd().split("\\")[-1] + ".MP4"   # Identify name of target video. If exists in folder, replace. If not, continue.
+        """
+        Create the name of the MP4 file based on the current working directory.
+        """
+        self.video_name = os.getcwd().split("\\")[-1] + ".MP4"
         if self.video_name in os.listdir():
             print("File already exists! Replacing...")
             os.remove(self.video_name)
-    def imgList(self):                                           # Create list of the tiff files in the target folder (no dirs, no non-tiffs)
-        self.imgs = []
-        for item in os.listdir():
-            if os.path.isdir(item) == 0:
-                if item.endswith(".tiff"):
-                    self.imgs.append(item)
+    def imgList(self):
+        """
+        Create a list of all TIFF files in the current working directory.
+        """
+        self.imgs = [item for item in os.listdir() if item.endswith(".tiff") and not os.path.isdir(item)]
+
 
 if __name__ == "__main__":
     mc = mp4Constructor()

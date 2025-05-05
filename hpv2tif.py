@@ -3,9 +3,20 @@ import numpy as np
 import cv2
 import tifffile
 import inquirer as inq
-import pathlib, sys
+import pathlib
+import argparse
 import subprocess as sp
 from alive_progress import alive_bar
+import sys
+
+os.chdir(pathlib.Path(__file__).parent.resolve())
+
+parser = argparse.ArgumentParser(description="Convert .DAT files to TIFF files", allow_abbrev=True)
+parser.add_argument("--batchprocess", action="store_true", default=False, help="Batch process all .DAT files in the current directory")
+parser.add_argument("--addtimestamp", action="store_true", default=False, help="Add relative timestamps to the bottom right of the TIFF files")
+parser.add_argument("--openfolder", action="store_true", default=False, help="Open the folder of TIFF files after processing")
+parser.add_argument("--makemp4", action="store_true", default=False, help="Convert the TIFF files to an MP4 video file")
+args = parser.parse_args()
 
 class DAT_Selector:
     def __init__(self):
@@ -16,50 +27,24 @@ class DAT_Selector:
                     self.ch.append(item)
 
     def userInput(self):
-        self.inputStamp = ''
-        self.inputChoice = ''
-        self.batch = ''
-        if "-b" not in sys.argv:
+        self.inputStamp = args.addtimestamp
+        self.inputChoice = args.openfolder
+        self.batch = args.batchprocess
+        if not dat_selector.ch:
+            print("No .DAT files found in the current directory.")
+            sys.exit(1)
+        if self.batch == False:
             self.inputFile = inq.list_input("Pick the .DAT file from the directory the script is located in", choices=self.ch)  # Prompt user input for which of these .dat files should be processed
-            if "-ys" or "-ns" in sys.argv:
-                if "-ys" in sys.argv:
-                    self.inputStamp = 'Yes'
-                if "-ns" in sys.argv:
-                    self.inputStamp = 'No'
-            if not ("-ys" or "-ns") in sys.argv:
-                self.inputStamp = inq.list_input("Do you want the relative timestamps in the bottom-right?", choices=['Yes', 'No'])
-            self.batch = False
-
-            if "-yc" or "-nc" in sys.argv:
-                if "-yc" in sys.argv:
-                    self.inputChoice = 'Yes'
-                if "-nc" in sys.argv:
-                    self.inputChoice = 'No'
-            if not "-yc" or not "-nc" in sys.argv:
-                self.inputChoice = inq.list_input("Do you want the folder of TIFF files opened afterward?", choices=['No', 'Yes'])
-
-        if "-b" in sys.argv:
-            if "-ys" or "-ns" in sys.argv:
-                if "-ys" in sys.argv:
-                    self.inputStamp = 'Yes'
-                if "-ns" in sys.argv:
-                    self.inputStamp = 'No'
-            if not ("-ys" or "-ns") in sys.argv:
-                self.inputStamp = inq.list_input("Do you want the relative timestamps in the bottom-right?", choices=['Yes', 'No'])
-            self.batch = True
-            self.inputChoice = "No"
 
     def dirCreation(self):
         self.outputDir = self.inputFile[:-4]
         if not os.path.isdir(self.outputDir+"_TIFF"):    # Make a folder for all the TIFF files to be put in and change to it.
             os.mkdir(self.outputDir+"_TIFF")
-        if not os.path.isdir(self.outputDir+"_TIFF/DIFFs"):    # Make a folder for all the TIFF files to be put in and change to it.
-            os.mkdir(self.outputDir+"_TIFF/DIFFs")
         self.outputStr = self.outputDir.split("\\")[-1]
 
 class BYTE_Recoverer:
     def __init__(self):    # The .dat file is raw binary, so we read it in as byte string
-        with open(ds.inputFile, 'rb') as fobj:
+        with open(dat_selector.inputFile, 'rb') as fobj:
             self.raw_bytes = fobj.read()
     def byteSearch(self, location, offsetAdd, nbytes):
         offset = self.raw_bytes.find(location)
@@ -67,12 +52,12 @@ class BYTE_Recoverer:
         byte_data = self.raw_bytes[offset:nbytes+offset]
         return byte_data
     def dateMaker(self):
-        year = int.from_bytes(dateTime_byteData[0:2],byteorder = "little", signed=False)
-        month = int.from_bytes(dateTime_byteData[2:4],byteorder = "little", signed=False)
-        day = int.from_bytes(dateTime_byteData[6:8],byteorder = "little", signed=False)
-        hour = int.from_bytes(dateTime_byteData[8:10], byteorder = "little", signed=False )
-        minute = int.from_bytes(dateTime_byteData[10:12], byteorder = "little", signed=False )
-        second = int.from_bytes(dateTime_byteData[12:14], byteorder = "little", signed=False )
+        year = int.from_bytes(tiff_writer.dateTime_byteData[0:2],byteorder = "little", signed=False)
+        month = int.from_bytes(tiff_writer.dateTime_byteData[2:4],byteorder = "little", signed=False)
+        day = int.from_bytes(tiff_writer.dateTime_byteData[6:8],byteorder = "little", signed=False)
+        hour = int.from_bytes(tiff_writer.dateTime_byteData[8:10], byteorder = "little", signed=False )
+        minute = int.from_bytes(tiff_writer.dateTime_byteData[10:12], byteorder = "little", signed=False )
+        second = int.from_bytes(tiff_writer.dateTime_byteData[12:14], byteorder = "little", signed=False )
         print('Date: ' + str(year) + '-' + str(month).zfill(2) + '-' + str(day).zfill(2) )
         print('Time: ' + str(hour).zfill(2) + ':' + str(minute).zfill(2) + ':' + str(second).zfill(2) )
 
@@ -82,11 +67,10 @@ class TIFF_Writer:
         self.fontScale = 1
         self.color = (255, 255, 255)
         self.thickness = 1
-        os.chdir(ds.outputDir+"_TIFF")
 
     def relTimeStamp(self, image):
-        if ds.inputStamp == 'Yes':
-            rt = f'{int(relTime):,}'
+        if dat_selector.inputStamp == True:
+            rt = f'{int(self.relTime):,}'
             frameText = rt + "ns"
 
             text_size, _ = cv2.getTextSize(frameText, self.font, self.fontScale, self.thickness)
@@ -99,101 +83,57 @@ class TIFF_Writer:
             image[y:y+h, x:x+w] = res
             cv2.putText(image, frameText, org, self.font, self.fontScale, self.color, self.thickness, cv2.LINE_4)
 
-if __name__ == "__main__":
-    os.chdir(pathlib.Path(__file__).parent.resolve())   # Change directory to that of where this script is located
-
-    ds = DAT_Selector()
-    ds.userInput()
-
-    if ds.batch == False:
-        ds.dirCreation()
-        br = BYTE_Recoverer()
-        recSpeed = br.byteSearch(b'\x30\x30\x07\x30', 14, 4).decode('utf-8')[:-1]
-        dateTime_byteData = br.byteSearch(b'\x40\x40\x0e\x40', 14, 16)
-        #br.dateMaker() #    Uncomment to print date and time at time of recording
-        imageNum = int.from_bytes(br.byteSearch(b'\x60\x60\x05\x60', 14, 4), "little")
-        relTime = br.byteSearch(b'\x60\x60\x06\x60', 14, 4).decode('ascii')
-        images_byteData = br.byteSearch(b'\xa0\xa0\x01\xa0', 14, (imageNum*250*400*4))
-
-        tw = TIFF_Writer()
-        
+    def process_file(self, dat_file, byte_recoverer, tiff_writer):
+        dat_selector.inputFile = dat_file
+        dat_selector.dirCreation()
+        os.chdir(dat_selector.outputDir+"_TIFF")
+        recSpeed = byte_recoverer.byteSearch(b'\x30\x30\x07\x30', 14, 4).decode('utf-8')[:-1]
+        self.dateTime_byteData = byte_recoverer.byteSearch(b'\x40\x40\x0e\x40', 14, 16)
+        imageNum = int.from_bytes(byte_recoverer.byteSearch(b'\x60\x60\x05\x60', 14, 4), "little")
+        self.relTime = byte_recoverer.byteSearch(b'\x60\x60\x06\x60', 14, 4).decode('ascii')
+        images_byteData = byte_recoverer.byteSearch(b'\xa0\xa0\x01\xa0', 14, (imageNum * 250 * 400 * 4))
+    
         first_img = None
         with alive_bar(imageNum, spinner="dots_waves", bar=None, calibrate=60, spinner_length=30) as bar:
-            for i in range(0, imageNum):
+            for i in range(imageNum):
                 is_first_img = (i <= 1)
-                frameNum = "{:03d}".format(i+1)  # Format index with leading zeros for use as the frame number
-                imagebytes=np.frombuffer(images_byteData[(i)*200000:200000*(i+1)],dtype=np.int16)
-                imagebytes=np.reshape(imagebytes,(250,400))
-                imagebytes=np.flipud(imagebytes) # flip vertically to match view in HPV viewer
-                tifffile.imwrite(ds.outputStr+'_'+frameNum+'.tiff', imagebytes)    # Initially, all the frames w/o the relative timestamps are created.
-                
-                img = cv2.imread(ds.outputStr+'_'+frameNum+'.tiff')                # Read each file in and draw the translucent black background and white text of the timestamp
-                tw.relTimeStamp(img)
-                cv2.imwrite(ds.outputStr+'_'+(frameNum)+'.tiff', img)              # Overwrite all of the TIFF files
-
-                diff_img = None
-                if is_first_img:
-                    first_img = img.copy()
-                else:
-                    diff_A = cv2.subtract(first_img, img) #cv2.absdiff(first_img, img)
-                    diff_B = cv2.subtract(diff_A, cv2.threshold(diff_A, 200, 255, cv2.THRESH_TOZERO)[1])
-                    diff_img = cv2.add(img, diff_B)
-                    diff_img = cv2.normalize(diff_img, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-                if not is_first_img:
-                    cv2.imwrite(f"DIFFs/diff_{ds.outputStr}_{frameNum}.tiff", diff_img)
-
-                relTime = int(relTime) + (int(recSpeed))                        # Increment the relative time by adding recSpeed to it
-                bar()
-        print("Finished!")
-
-        if(ds.inputChoice == "Yes"):
-            sp.Popen(r'explorer /separate,'+os.getcwd())  # Show video file in explorer
-        if "-mp4" in sys.argv:
-            os.chdir("..")
-            os.system("python convert.py ")
-
-    if ds.batch == True:
+                frameNum = f"{i+1:03d}"
+                imagebytes = np.frombuffer(images_byteData[i * 200000:(i + 1) * 200000], dtype=np.int16)
+                imagebytes = np.reshape(imagebytes, (250, 400))
+                imagebytes = np.flipud(imagebytes)
+                tifffile.imwrite(dat_selector.outputStr + f'_{frameNum}.tiff', imagebytes)
         
-        batch_br = [0] * len(ds.ch)
-        with alive_bar(len(ds.ch)*(256), spinner="dots_waves", bar=None, calibrate=60, spinner_length=35) as bar_batch:
-            for n, dat in enumerate(ds.ch):
-                ds.inputFile = dat
-                ds.dirCreation()
-                batch_br[n] = BYTE_Recoverer()
-                recSpeed = batch_br[n].byteSearch(b'\x30\x30\x07\x30', 14, 4).decode('utf-8')[:-1]
-                dateTime_byteData = batch_br[n].byteSearch(b'\x40\x40\x0e\x40', 14, 16)
-                #batch_br[n].dateMaker() #    Uncomment to print date and time at time of recording
-                imageNum = int.from_bytes(batch_br[n].byteSearch(b'\x60\x60\x05\x60', 14, 4), "little")
-                relTime = batch_br[n].byteSearch(b'\x60\x60\x06\x60', 14, 4).decode('ascii')
-                images_byteData = batch_br[n].byteSearch(b'\xa0\xa0\x01\xa0', 14, (imageNum*250*400*4))
+                img = cv2.imread(dat_selector.outputStr + f'_{frameNum}.tiff')
+                tiff_writer.relTimeStamp(img)
+                cv2.imwrite(dat_selector.outputStr + f'_{frameNum}.tiff', img)
+        
+                self.relTime = int(self.relTime) + int(recSpeed)
+                bar()
+            
+if __name__ == "__main__":
+    dat_selector = DAT_Selector()
+    dat_selector.userInput()
+    tiff_writer = TIFF_Writer()
 
-                tw = TIFF_Writer()
-                
-                first_img = None
-                for i in range(0, imageNum):
-                    is_first_img = (i <= 1)
-                    frameNum = "{:03d}".format(i+1)  # Format index with leading zeros for use as the frame number
-                    imagebytes=np.frombuffer(images_byteData[(i)*200000:200000*(i+1)],dtype=np.int16)
-                    imagebytes=np.reshape(imagebytes,(250,400))
-                    imagebytes=np.flipud(imagebytes) # flip vertically to match view in HPV viewer
-                    tifffile.imwrite(ds.outputStr+'_'+frameNum+'.tiff', imagebytes)    # Initially, all the frames w/o the relative timestamps are created.
-                    
-                    img = cv2.imread(ds.outputStr+'_'+frameNum+'.tiff')                # Read each file in and draw the translucent black background and white text of the timestamp
-                    tw.relTimeStamp(img)
-                    cv2.imwrite(ds.outputStr+'_'+(frameNum)+'.tiff', img)              # Overwrite all of the TIFF files
-
-                    diff_img = None
-                    if is_first_img:
-                        first_img = img.copy()
-                    else:
-                        diff_A = cv2.subtract(first_img, img) #cv2.absdiff(first_img, img)
-                        diff_B = cv2.subtract(diff_A, cv2.threshold(diff_A, 200, 255, cv2.THRESH_TOZERO)[1])
-                        diff_img = cv2.add(img, diff_B)
-                        diff_img = cv2.normalize(diff_img, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-                    if not is_first_img:
-                        cv2.imwrite(f"DIFFs/diff_{ds.outputStr}_{frameNum}.tiff", diff_img)
-
-                    relTime = int(relTime) + (int(recSpeed))                        # Increment the relative time by adding recSpeed to it
-                    bar_batch()
-                print(ds.outputStr + " processed! " + str(n+1) + "/" + str(len(ds.ch)))
-                os.chdir("..")
+    if dat_selector.batch:
+        for n, dat_file in enumerate(dat_selector.ch):
+            dat_selector.inputFile = dat_file
+            byte_recoverer = BYTE_Recoverer()
+            tiff_writer.process_file(dat_file, byte_recoverer, tiff_writer)
+            print(dat_selector.outputStr + " processed! " + str(n+1) + "/" + str(len(dat_selector.ch)))
+            os.chdir("..")
+            if args.makemp4:
+                sp.run(["python", "convert.py", "--folder", os.getcwd()+"\\"+dat_selector.outputStr+"_TIFF"], check=True)
+            if n == len(dat_selector.ch)-1:
+                print("All files processed!")
+        if(dat_selector.inputChoice == True):
+            sp.Popen(r'explorer /open,'+os.getcwd()+"\\")
+    else:
+        byte_recoverer = BYTE_Recoverer()
+        tiff_writer.process_file(dat_selector.inputFile, byte_recoverer, tiff_writer)
+        print(dat_selector.outputStr + " processed!")
+        if(dat_selector.inputChoice == True):
+            sp.Popen(r'explorer /open,'+os.getcwd()+"\\")
+        os.chdir("..")
+        if args.makemp4:
+            sp.run(["python", "convert.py", "--folder", os.getcwd()], check=True)
