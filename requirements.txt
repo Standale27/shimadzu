@@ -3,3 +3,4 @@ opencv-python
 tifffile
 inquirer
 alive-progress
+moviepy
