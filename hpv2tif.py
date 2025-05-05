@@ -135,6 +135,5 @@ if __name__ == "__main__":
         if(dat_selector.inputChoice == True):
             sp.Popen(r'explorer /open,'+os.getcwd()+"\\")
         os.chdir("..")
-        print(os.getcwd())
         if args.makemp4:
             sp.run(["python", "convert.py", "--folder", os.getcwd()+"\\"+dat_selector.outputStr+"_TIFF"], check=True)
