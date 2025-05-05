@@ -4,7 +4,7 @@
 
 Enables conversion of proprietary .DAT files for Shimadzu HPV software from .DAT to however many .TIFF 16-bit frames are in the video using the hpv2tif.py script
 Also allows for conversion of the .TIFF files to .MP4 files with the convert.py script
-Include both scripts and the .DLL file in the directory with the .DAT files
+Include both scripts in the directory with the .DAT files
 
 Required packages shown in requirements.txt
 
