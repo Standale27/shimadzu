@@ -6,6 +6,7 @@ Enables conversion of proprietary .DAT files for Shimadzu HPV software from .DAT
 Also allows for conversion of the .TIFF files to .MP4 files with the convert.py script
 Include both scripts and the .DLL file in the directory with the .DAT files
 
+Required packages shown in requirements.txt
 
 Running hpv2tif.py with no specified arguments will list the .DAT files in the directory in which the script is located. Choose a file to create the folder of TIFF images.
 
