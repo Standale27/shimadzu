@@ -11,12 +11,16 @@ Running hpv2tif.py with no specified arguments will list the .DAT files in the d
 
 There are four arguments you can use when running hpv2tif.py:
 >--batchprocess
+>
       Batch processes all .DAT files in current directory
 >--addtimestamp
+>
       Adds timestamps in the bottom right corner of the generated .TIFF files
 >--openfolder
+>
       Opens the folder for the converted .DAT file/files
 >--makemp4
+>
       Runs convert.py after the .DAT file has been converted. This takes ~25 seconds per .DAT file
 
 Convert.py works similarly, where running the script by itself will list the folders in the directory. Choose a folder with .TIFF files in it for conversion to a .MP4 video
